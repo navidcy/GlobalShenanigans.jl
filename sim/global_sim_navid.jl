@@ -3,11 +3,12 @@ using JLD2
 using Printf
 using CUDA
 using CairoMakie
+using GeoMakie
 using Oceananigans
+
 using Oceananigans.Units
 using Oceananigans.Fields: interpolate, Field
 using Oceananigans.Architectures: arch_array
-using Oceananigans.Coriolis: HydrostaticSphericalCoriolis
 using Oceananigans.BoundaryConditions
 using Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid, GridFittedBottom, inactive_node, peripheral_node
 # solid_node is inactive_node and peripheral_node is peripheral_node
@@ -20,9 +21,8 @@ using Oceananigans.Advection: EnergyConservingScheme, VelocityStencil, Vorticity
 using Oceananigans.TurbulenceClosures: FluxTapering
 using SeawaterPolynomials.TEOS10
 using Oceananigans.Advection: VelocityStencil
-
-using Oceananigans.TurbulenceClosures.CATKEVerticalDiffusivities:
-    CATKEVerticalDiffusivity, MixingLength
+using Oceananigans.TurbulenceClosures.CATKEVerticalDiffusivities: CATKEVerticalDiffusivity,
+                                                                  MixingLength
 
 # Memo to self, change the surface relaxation to be a lot more relaxed
 global_filepath = "/storage1/uq-global/GlobalShenanigans.jl/"
@@ -76,10 +76,7 @@ bathymetry = jldopen(global_filepath * "bathymetry-360x150-latitude-75.0.jld2")[
 
 grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(bathymetry))
 
-λc = grid.λᶜᵃᵃ[1:grid.Nx]
-φc = grid.φᵃᶜᵃ[1:grid.Ny]
-z = grid.zᵃᵃᶜ[1:grid.Nz]
-
+λc, φc, zc = grid.λᶜᵃᵃ[1:grid.Nx], grid.φᵃᶜᵃ[1:grid.Ny], grid.zᵃᵃᶜ[1:grid.Nz]
 
 #####
 ##### Load forcing files and inital conditions from ECCO version 4
@@ -108,7 +105,10 @@ datadep_path = @datadep_str "quarter_degree_near_global_lat_lon/z_faces-50-level
 # plot bathymetry
 bathymetry_for_plot = Array(bathymetry)
 bathymetry_for_plot[bathymetry .== 100] .= NaN
-fig, ax, hm = heatmap(λc, φc, bathymetry_for_plot; colorrange = (-9000, 0), nan_color=:black)
+
+fig = Figure()
+ga = GeoAxis(fig[1, 1]; dest = "+proj=eqearth", title = "bathymetry", coastlines = true)
+hm = heatmap!(ga, λc, φc, bathymetry_for_plot; colorrange = (-9000, 0), nan_color=:black)
 Colorbar(fig[1, 2], hm)
 save(output_filepath * "bathymetry.png", fig)
 
@@ -125,22 +125,31 @@ S★ = jldopen(global_filepath * "boundary_conditions-1degree.jld2")["Sˢ"]
 
 τˣ_for_plot = Array(τˣ[:, :, 1])
 τˣ_for_plot[bathymetry .== 100] .= NaN
-fig, ax, hm = heatmap(λc, φc, τˣ_for_plot;
-                      colormap = :balance,
-                      colorrange = (-2e-4, 2e-4),
-                      nan_color=:black)
+
+fig = Figure()
+ga = GeoAxis(fig[1, 1]; dest = "+proj=eqearth", title = "zonal wind stress", coastlines = true)
+hm = heatmap!(ga, λc, φc, τˣ_for_plot;
+              colormap = :balance,
+              colorrange = (-2e-4, 2e-4),
+              nan_color=:black)
 Colorbar(fig[1, 2], hm)
 save(output_filepath * "taux_january_ecco.png", fig)
 
 T_for_plot = Array(T★[:, :, 1])
 T_for_plot[bathymetry .== 100] .= NaN
-fig, ax, hm = heatmap(λc, φc, T_for_plot; nan_color=:black)
+
+fig = Figure()
+ga = GeoAxis(fig[1, 1]; dest = "+proj=eqearth", title = "SST", coastlines = true)
+hm = heatmap!(λc, φc, T_for_plot; nan_color=:black)
 Colorbar(fig[1, 2], hm)
 save(output_filepath * "temperature_january_ecco.png", fig)
 
 S_for_plot = Array(S★[:, :, 1])
 S_for_plot[bathymetry .== 100] .= NaN
-fig, ax, hm = heatmap(λc, φc, S_for_plot; nan_color=:black)
+
+fig = Figure()
+ga = GeoAxis(fig[1, 1]; dest = "+proj=eqearth", title = "SSS", coastlines = true)
+hm = heatmap!(λc, φc, S_for_plot; nan_color=:black)
 Colorbar(fig[1, 2], hm)
 save(output_filepath * "salinity_january_ecco.png", fig)
 
@@ -151,16 +160,18 @@ bathymetry = arch_array(arch, bathymetry)
 
 τˣ_for_plot = Array(τˣ[:, :, 1])
 τˣ_for_plot[bathymetry .== 100] .= NaN
-fig, ax, hm = heatmap(λc, φc, τˣ_for_plot;
-                      colormap = :balance,
-                      colorrange = (-2e-4, 2e-4),
-                      nan_color=:black)
+
+fig = Figure()
+ga = GeoAxis(fig[1, 1]; dest = "+proj=eqearth", title = "zonal wind stress", coastlines = true)
+hm = heatmap!(ga, λc, φc, τˣ_for_plot;
+              colormap = :balance,
+              colorrange = (-2e-4, 2e-4),
+              nan_color=:black)
 Colorbar(fig[1, 2], hm)
 save(output_filepath * "taux_january_used_bc.png", fig)
 
 target_sea_surface_temperature = T★ = arch_array(arch, T★)
 target_sea_surface_salinity = S★ = arch_array(arch, S★)
-
 
 
 #####
@@ -185,10 +196,7 @@ using Oceananigans.TurbulenceClosures: ExplicitTimeDiscretization
 
 convective_adjustment = ConvectiveAdjustmentVerticalDiffusivity(convective_κz=1e-1, background_κz=1e-5, convective_νz=1e-4, background_νz=1e-5)
 biharmonic_viscosity = HorizontalScalarBiharmonicDiffusivity(ν=νhb, discrete_form=true)
-gent_mcwilliams_diffusivity = IsopycnalSkewSymmetricDiffusivity(
-    κ_skew=κ_skew,
-    κ_symmetric=κ_symmetric,
-    slope_limiter=FluxTapering(1e-2))
+gent_mcwilliams_diffusivity = IsopycnalSkewSymmetricDiffusivity(; κ_skew, κ_symmetric, slope_limiter=FluxTapering(1e-2))
 
 closures = (biharmonic_viscosity, convective_adjustment, gent_mcwilliams_diffusivity)
 
@@ -306,7 +314,7 @@ buoyancy = SeawaterBuoyancy(equation_of_state = eos)
 forcings = (u = Fu, v = Fv)
 
 model = HydrostaticFreeSurfaceModel(; grid, free_surface,
-                                    momentum_advection = WENO5(grid = underlying_grid, vector_invariant=VelocityStencil()),
+                                    momentum_advection = WENO(grid = underlying_grid, vector_invariant=VelocityStencil()),
                                     coriolis = HydrostaticSphericalCoriolis(scheme = EnergyConservingScheme()),
                                     buoyancy,
                                     # tracers = (:T, :S, :e),
@@ -314,7 +322,7 @@ model = HydrostaticFreeSurfaceModel(; grid, free_surface,
                                     closure = closures,
                                     boundary_conditions,
                                     forcing = forcings,
-                                    tracer_advection = WENO5(; grid = underlying_grid)
+                                    tracer_advection = WENO(; grid = underlying_grid)
                                     )
 
 #####
@@ -334,8 +342,6 @@ T_init = file_init["T"]
 S_init = file_init["S"]
 
 set!(model, T=T_init, S=S_init)
-fill_halo_regions!(T)
-fill_halo_regions!(S)
 
 @info "model initialized"
 
@@ -347,26 +353,21 @@ fill_halo_regions!(S)
 
 simulation = Simulation(model, Δt = Δt, stop_time = Nyears * years)
 
-initial_e(x, y, z) = exp((-x^2 -y^2)/30^2 ) * exp(-(z+1000)^2/100^2)
-
-# set!(model, e = initial_e)
-
 start_time = [time_ns()]
 
 using Oceananigans.Models.HydrostaticFreeSurfaceModels: VerticalVorticityField
 
 ζ = VerticalVorticityField(model)
-δ = Field(∂x(model.velocities.u) + ∂y(model.velocities.v))
+δ = Field(∂x(u) + ∂y(v))
 
 function progress(sim)
     wall_time = (time_ns() - start_time[1]) * 1e-9
 
     u = sim.model.velocities.u
 
-    @info @sprintf("Time: % 12s, iteration: %d, max(|u|): %.2e ms⁻¹, wall time: %s",
-        prettytime(sim.model.clock.time),
-        sim.model.clock.iteration, maximum(u),
-        prettytime(wall_time))
+    @info @sprintf("Time: % 12s, iteration: %d, max(|u|): %.2e ms⁻¹, max(|w|): %.2e ms⁻¹, wall time: %s",
+        prettytime(sim.model.clock.time), sim.model.clock.iteration,
+        maximum(abs, u), maximum(abs, w), prettytime(wall_time))
 
     start_time[1] = time_ns()
 
@@ -388,7 +389,6 @@ outputs = (; u, v, T, S, η)
 # average_outputs = (; u, v, T, S, η, e, u2, v2, T2, η2)
 average_outputs = (; u, v, T, S, η, u2, v2, T2, η2)
 
-
 simulation.output_writers[:surface_fields] = JLD2OutputWriter(model, (; u, v, T, S, η),
                                                               schedule = TimeInterval(save_interval),
                                                               filename = output_prefix * "_surface",
@@ -406,6 +406,7 @@ simulation.output_writers[:checkpointer] = Checkpointer(model,
                                                         prefix = output_prefix * "_checkpoint",
                                                         overwrite_existing = true)
 =#
+
 # Let's go!
 @info "Running with Δt = $(prettytime(simulation.Δt))"
 
@@ -423,12 +424,6 @@ if load_initial_condition
                     T = arch_array(arch, jlfile["tracers"]["T"]),
                     S = arch_array(arch, jlfile["tracers"]["S"]),
                     η = arch_array(arch, jlfile["free_surface"]["eta"]))
-        # interior(simulation.model.velocities.u) .= arch_array(arch, jlfile["velocities"]["u"])
-        # interior(simulation.model.velocities.v) .= arch_array(arch, jlfile["velocities"]["v"])
-        # interior(simulation.model.velocities.w) .= arch_array(arch, jlfile["velocities"]["w"])
-        # interior(simulation.model.tracers.T) .= arch_array(arch, jlfile["tracers"]["T"])
-        # interior(simulation.model.tracers.S) .= arch_array(arch, jlfile["tracers"]["S"])
-        # interior(simulation.model.free_surface.η) .= arch_array(arch, jlfile["free_surface"]["eta"])
     end
     close(jlfile)
 end
