@@ -60,7 +60,7 @@ pickup_file = false
 z_faces = jldopen(global_filepath * "zgrid.jld2")["z"][5:end-4]
 
 # An almost-global spherical domain
-@show underlying_grid = LatitudeLongitudeGrid(arch,
+@show underlying_grid = LatitudeLongitudeGrid(arch;
                                               size = (Nx, Ny, Nz),
                                               longitude = (-180, 180),
                                               latitude,
@@ -283,6 +283,8 @@ function progress(sim)
         maximum(abs, u), maximum(abs, w), prettytime(wall_time))
 
     start_time[1] = time_ns()
+
+    flush(stdout)
 
     return nothing
 end
