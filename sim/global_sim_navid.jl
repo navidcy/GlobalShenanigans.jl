@@ -51,13 +51,13 @@ const Nyears = 40.0
 const Nmonths = 12
 const thirty_days = 30days
 
-output_prefix = output_filepath * "near_global_lat_lon_$(Nx)_$(Ny)_$(Nz)"
+output_prefix = output_filepath * "multithreaded_near_global_lat_lon_$(Nx)_$(Ny)_$(Nz)"
 
 println("running " * output_prefix)
 pickup_file = false
 
 # Stretched faces taken from ECCO Version 4 (50 levels in the vertical)
-z_faces = jldopen(global_filepath * "zgrid.jld2")["z"][5:end-4]
+z_faces = jldopen(input_filepath * "zgrid.jld2")["z"][5:end-4]
 
 # An almost-global spherical domain
 @show underlying_grid = LatitudeLongitudeGrid(arch;
@@ -253,7 +253,7 @@ u, v, w = model.velocities
 T = model.tracers.T
 S = model.tracers.S
 
-file_initital_conditions = jldopen(global_filepath * "initial_conditions-1degree.jld2")
+file_initital_conditions = jldopen(input_filepath * "initial_conditions-1degree.jld2")
 
 @info "Reading initial conditions"
 T₀ = file_initital_conditions["T"]
