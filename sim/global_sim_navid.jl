@@ -198,26 +198,30 @@ v_bottom_drag_bc = FluxBoundaryCondition(v_bottom_drag, discrete_form=true, para
 
 @inline function surface_temperature_relaxation(i, j, grid, clock, fields, p)
     @inbounds T_surface = fields.T[i, j, grid.Nz]
-    
+    @inbounds T★ = T★[i, j]
+
     return p.λ * (T_surface - p.T★)
 end
 
 @inline function surface_salinity_relaxation(i, j, grid, clock, fields, p)
     @inbounds S_surface = fields.S[i, j, grid.Nz]
+    @inbounds S★ = S★[i, j]
     
-    return p.λ * (S_surface - p.S★)
+    return p.λ * (S_surface - S★)
 end
 
 Δz_top = @allowscalar Δzᵃᵃᶜ(1, 1, grid.Nz, grid.underlying_grid)
 Δz_bottom = @allowscalar Δzᵃᵃᶜ(1, 1, 1, grid.underlying_grid)
 
-T_surface_relaxation_bc = FluxBoundaryCondition(surface_temperature_relaxation,
-    discrete_form=true,
-    parameters=(λ=Δz_top / 28days, T★=target_sea_surface_temperature))
+T_surface_relaxation_bc =
+    FluxBoundaryCondition(surface_temperature_relaxation,
+                          discrete_form=true,
+                          parameters=(λ = Δz_top / 28days, T★ = target_sea_surface_temperature))
 
-S_surface_relaxation_bc = FluxBoundaryCondition(surface_salinity_relaxation,
-    discrete_form=true,
-    parameters=(λ=Δz_top / 28days, S★=target_sea_surface_salinity))
+S_surface_relaxation_bc =
+    FluxBoundaryCondition(surface_salinity_relaxation,
+                          discrete_form=true,
+                          parameters=(λ = Δz_top / 28days, S★ = target_sea_surface_salinity))
 
 u_bcs = FieldBoundaryConditions(top = u_wind_stress_bc, bottom = u_bottom_drag_bc)
 v_bcs = FieldBoundaryConditions(top = v_wind_stress_bc, bottom = v_bottom_drag_bc)
@@ -278,11 +282,16 @@ start_time = [time_ns()]
 function progress(sim)
     wall_time = (time_ns() - start_time[1]) * 1e-9
 
-    u = sim.model.velocities.u
+    u, v, w = sim.model.velocities.u, sim.model.velocities.v, sim.model.velocities.w
 
-    @info @sprintf("Time: % 12s, iteration: %d, max(|u|): %.2e ms⁻¹, max(|w|): %.2e ms⁻¹, wall time: %s",
-        prettytime(sim.model.clock.time), sim.model.clock.iteration,
-        maximum(abs, u), maximum(abs, w), prettytime(wall_time))
+    @info @sprintf("Time: % 12s, iteration: %d, max(|u|, |v|, |w|): (%.2e, %.2e, %.2e) ms⁻¹, cfl: %.2e, wall time: %s",
+        prettytime(sim.model.clock.time),
+        sim.model.clock.iteration,
+        maximum(abs, u),
+        maximum(abs, v),
+        maximum(abs, w),
+        AdvectiveCFL(sim.Δt)(sim.model),
+        prettytime(wall_time))
 
     start_time[1] = time_ns()
 
