@@ -25,8 +25,8 @@ using Oceananigans.TurbulenceClosures.CATKEVerticalDiffusivities: CATKEVerticalD
 
 
 global_filepath = "/storage1/uq-global/GlobalShenanigans.jl/"
-input_filepath  = "/home/navidcy/NavidGlobalShenanigans.jl/input/"
-output_filepath = "/home/navidcy/NavidGlobalShenanigans.jl/output/"
+input_filepath  = joinpath(@__DIR__, "..", "input/")
+output_filepath = joinpath(@__DIR__, "..", "output/")
 
 load_initial_condition = false
 ic_filepath = global_filepath * "smooth_ic_7.jld2" # start from 7
@@ -36,7 +36,7 @@ qs_filepath = global_filepath * "smooth_ic_10.jld2" # 6 is the last one with ecc
 ##### Grid
 #####
 
-arch = GPU()
+arch = CPU()
 reference_density = 1029.0 # kg/m^3
 
 latitude = (-75, 75)
@@ -53,7 +53,6 @@ const thirty_days = 30days
 
 output_prefix = output_filepath * "multithreaded_near_global_lat_lon_$(Nx)_$(Ny)_$(Nz)"
 
-println("running " * output_prefix)
 pickup_file = false
 
 # Stretched faces taken from ECCO Version 4 (50 levels in the vertical)
@@ -75,6 +74,7 @@ grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(bathymetry))
 λc, φc, zc = grid.λᶜᵃᵃ[1:grid.Nx], grid.φᵃᶜᵃ[1:grid.Ny], grid.zᵃᵃᶜ[1:grid.Nz]
 
 # plot bathymetry
+@info "Plotting input fields..."
 bathymetry_for_plot = Array(bathymetry)
 bathymetry_for_plot[bathymetry .== 100] .= NaN
 
@@ -137,6 +137,8 @@ hm = heatmap!(ga, λc, φc, τˣ_for_plot;
               nan_color=:black)
 Colorbar(fig[1, 2], hm)
 save(output_filepath * "taux_month$(month)_used_bc.png", fig)
+
+@info "Plotting completed!"
 
 target_sea_surface_temperature = T★ = arch_array(arch, T★)
 target_sea_surface_salinity = S★ = arch_array(arch, S★)
@@ -261,7 +263,7 @@ S₀ = file_initital_conditions["S"]
 
 set!(model, T=T₀, S=S₀)
 
-@info "Model is initialized with T and S from $(file_init)"
+@info "Model is initialized with T and S from $(file_initital_conditions)"
 
 #####
 ##### Simulation setup
@@ -329,7 +331,7 @@ simulation.output_writers[:checkpointer] = Checkpointer(model,
 =#
 
 # Let's go!
-@info "Running with Δt = $(prettytime(simulation.Δt))"
+@info "Running simulation with Δt = $(prettytime(simulation.Δt))"
 
 if load_initial_condition
     @info "load in initial condition from " * ic_filepath
