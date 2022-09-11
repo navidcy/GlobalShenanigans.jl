@@ -198,14 +198,14 @@ v_bottom_drag_bc = FluxBoundaryCondition(v_bottom_drag, discrete_form=true, para
 
 @inline function surface_temperature_relaxation(i, j, grid, clock, fields, p)
     @inbounds T_surface = fields.T[i, j, grid.Nz]
-    @inbounds T★ = T★[i, j]
+    @inbounds T★ = p.T★[i, j]
 
-    return p.λ * (T_surface - p.T★)
+    return p.λ * (T_surface - T★)
 end
 
 @inline function surface_salinity_relaxation(i, j, grid, clock, fields, p)
     @inbounds S_surface = fields.S[i, j, grid.Nz]
-    @inbounds S★ = S★[i, j]
+    @inbounds S★ = p.S★[i, j]
     
     return p.λ * (S_surface - S★)
 end
